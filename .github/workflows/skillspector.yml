@@ -1,0 +1,35 @@
+name: SkillSpector Security Scan
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  skillspector:
+    name: Scan AI agent skills
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install SkillSpector
+        run: python -m pip install "git+https://github.com/NVIDIA/skillspector.git"
+      - name: Scan discovered skills
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t skill_files < <(find . -type f -name SKILL.md -not -path "./.git/*" -print)
+          if [ "${#skill_files[@]}" -eq 0 ]; then echo "No SKILL.md files found; nothing to scan."; exit 0; fi
+          for skill_file in "${skill_files[@]}"; do
+            skill_dir="$(dirname "$skill_file")"
+            echo "::group::SkillSpector: $skill_dir"
+            skillspector scan "$skill_dir" --no-llm
+            echo "::endgroup::"
+          done
